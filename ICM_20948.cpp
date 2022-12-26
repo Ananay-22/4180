@@ -1,4 +1,5 @@
 #include "ICM_20948.h"
+#include <cstdio>
 
 // TODO: make sure right bank is selected in command interface
 namespace ECE4180 {
@@ -19,6 +20,7 @@ namespace ECE4180 {
         char tmp[2];
         tmp[0]=registerAddress;
         tmp[1]= data . RAW;
+        DPRINT("Writing Command: %2x %2x\r\n", tmp[0], tmp[1]);
         I2C :: write(ICM20948_ADDRESS,  tmp, 2, 0); // no stop
         thread_sleep_for(10);
         // TODO: check wait?
@@ -26,15 +28,26 @@ namespace ECE4180 {
 
     void ICM_20948::read(ICM_20948_BANK_REGISTERS registerAddress, ICM_20948_BANK_DATA& dest)
     {
+        // D(
+            // I AM SO DUMB
+            // PUTTING THIS CHECK TO SEE IF THE ICM IS CONNECTED BEFORE A READ
+            // EVEN FOR "DEBUGGING PURPOSES"
+            // BREAKS THE CODE SINCE IT SWITCHES TO BANK_0
+            // DUH DOY - Ananay Gupta
+            // if (registerAddress != WHO_AM_I_ICM20948)  {
+            //     if (!this -> isConnected()) {
+            //         exit(1);
+            //     }
+            // }
+        // );
         char tmp[1];
         tmp[0]=registerAddress;
         I2C ::  write(ICM20948_ADDRESS, tmp, 1, 1); // no stop
-        //tmp[0]=data;
-        I2C ::  read(ICM20948_ADDRESS, tmp, 1, 0);//stop
+        I2C ::  read(ICM20948_ADDRESS, tmp, 1, 0); //stop
         thread_sleep_for(10);
         // Return data read from slave register
         dest . RAW = tmp[0];
-
+        DPRINT("Reading Command: %2x -> %2x\r\n", registerAddress, tmp[0]);
         // TODO: check wait?
     }
 
@@ -165,6 +178,9 @@ namespace ECE4180 {
     {
         if (this -> currentBank == bank) return;
         this -> write(REG_BANK_SEL, bank);
+
+        // OH NO I FORGOT THIS LINE BEFORE, IT REALLY MESSED THINGS UP
+        this -> currentBank = bank;
     }
 
     void ICM_20948::reset()
@@ -203,14 +219,16 @@ namespace ECE4180 {
     {
         this -> setBank(BANK_0);
         // TODO: be a bit smart about this, it should be able to handle all the different parameters datasheet: 7.1
-        int x = 0 / 0;
+        
+        exit(1);
     }
 
     void ICM_20948::enableFIFO()
     {
         this -> setBank(BANK_0);
         // TODO: be a bit smart about this, it should be able to handle all the different parameters datasheet: 8.56/ 8.57
-        int x = 0 / 0;
+        
+        exit(1);
     }
 
     void ICM_20948::resetDMP()
@@ -246,10 +264,15 @@ namespace ECE4180 {
 
     }
 
+    byte ICM_20948::whoami() {
+        this -> setBank(BANK_0);
+        return this -> read(WHO_AM_I_ICM20948);
+    }
+
     bool ICM_20948::isICM_20948()
     {
         this -> setBank(BANK_0);
-        return this -> read(WHO_AM_I_ICM20948) == 0xEA;
+        return this -> whoami() == 0xEA;
     }
 
     bool ICM_20948::isConnected()
@@ -287,21 +310,33 @@ namespace ECE4180 {
     }
 
 
-
-    void ICM_20948_selfTest(ICM_20948& icm, BufferedSerial* pc)
+    // Accelerometer and gyroscope self test; check calibration wrt factory settings
+    // Should return percent deviation from factory trim values, +/- 14 or less
+    // deviation is a pass.
+    void ICM_20948_selfTest(ICM_20948& icm)
     {
+        printf("Running ICM 20948 Self Test\r\n");
         uint8_t rawData[6] = {0, 0, 0, 0, 0, 0};
         uint8_t selfTest[6];
         int32_t gAvg[3] = {0}, aAvg[3] = {0}, aSTAvg[3] = {0}, gSTAvg[3] = {0};
         float factoryTrim[6];
         uint8_t FS = 0;
+        int iters = 20;
 
         ICM_20948_BANK_DATA param, value;
+
+        DPRINT("1\n");
 
         icm . reset();
         icm . setClockDefault();
 
+
+        DPRINT("2\n");
+
         icm . setBank(BANK_2);
+        DPRINT("Current Bank: %x (should be 2)\n", icm . read(REG_BANK_SEL));
+
+
         param . RAW = 0;
         icm . write(GYRO_SMPLRT_DIV, param);
 
@@ -309,7 +344,7 @@ namespace ECE4180 {
         param . GYRO_CONFIG_1 . GYRO_FS_SEL = 0x0;
         param . GYRO_CONFIG_1 . GYRO_FCHOICE = 0x1;
 
-        icm . write(GYRO_CONFIG_1, param);
+        icm . write(GYRO_CONFIG_1, 0x11);
 
 
         param . RAW = 0;
@@ -317,13 +352,17 @@ namespace ECE4180 {
         param . ACCEL_CONFIG . ACCEL_FS_SEL = 0x0;
         param . ACCEL_CONFIG . ACCEL_FCHOICE = 0x1;
 
-        icm . write(ACCEL_CONFIG, param);
+        icm . write(ACCEL_CONFIG, 0x11);
 
-        icm . setBank(BANK_0);
+        icm . setBank(BANK_0);         
+        DPRINT("Current Bank: %x (should be 0)\n", icm . read(REG_BANK_SEL));
 
-        for (int i = 0; i < 200; i++) {
+        printf("Polling without test mode\r\n");
+        for (int i = 0; i < iters; i++) {
+            printf(".");
+            fflush(stdout);
             for (int j = 0; j < 6; j++) {
-                rawData[0] = icm . read(ACCEL_XOUT_H + j);
+                rawData[j] = icm . read(ACCEL_XOUT_H + j);
             }
 
             aAvg[0] += (int16_t)(((int16_t)rawData[0] << 8) | rawData[1]) ;
@@ -331,18 +370,70 @@ namespace ECE4180 {
             aAvg[2] += (int16_t)(((int16_t)rawData[4] << 8) | rawData[5]) ;
 
             for (int j = 0; j < 6; j++) {
-                rawData[0] = icm . read(GYRO_XOUT_H + j);
+                rawData[j] = icm . read(GYRO_XOUT_H + j);
             }
+            
+            gAvg[0] += (int16_t)(((int16_t)rawData[0] << 8) | rawData[1]) ;
+            gAvg[1] += (int16_t)(((int16_t)rawData[2] << 8) | rawData[3]) ;
+            gAvg[2] += (int16_t)(((int16_t)rawData[4] << 8) | rawData[5]) ;
         }
-        gAvg[0] += (int16_t)(((int16_t)rawData[0] << 8) | rawData[1]) ;
-        gAvg[1] += (int16_t)(((int16_t)rawData[2] << 8) | rawData[3]) ;
-        gAvg[2] += (int16_t)(((int16_t)rawData[4] << 8) | rawData[5]) ;
 
 
         for (int i = 0; i < 3; i++) {
-            aAvg[i] /= 200;
-            gAvg[i] /= 200;
+            aAvg[i] /= iters;
+            gAvg[i] /= iters;
         }
+        
+        DPRINT("3\n");
+        icm . setBank(BANK_2);
+        DPRINT("Current Bank: %x (should be 2)\n", icm . read(REG_BANK_SEL));
+
+        param . GYRO_CONFIG_1 . GYRO_DLPFCFG = 0x2;
+        param . GYRO_CONFIG_1 . GYRO_FS_SEL = 0x0;
+        param . GYRO_CONFIG_1 . GYRO_FCHOICE = 0x1;
+
+        icm . write(GYRO_CONFIG_2, 0x38);
+
+
+        param . RAW = 0;
+        param . ACCEL_CONFIG . ACCEL_DLPFCFG = 0x2;
+        param . ACCEL_CONFIG . ACCEL_FS_SEL = 0x0;
+        param . ACCEL_CONFIG . ACCEL_FCHOICE = 0x1;
+
+        icm . write(ACCEL_CONFIG_2, 0x1C);
+
+        icm . setBank(BANK_0);         
+        DPRINT("Current Bank: %x (should be 0)\n", icm . read(REG_BANK_SEL));
+        printf("\n\rPolling with test mode\r\n");
+        for (int i = 0; i < iters; i++) {
+            printf(".");
+            fflush(stdout);
+            for (int j = 0; j < 6; j++) {
+                rawData[j] = icm . read(ACCEL_XOUT_H + j);
+            }
+
+            aSTAvg[0] += (int16_t)(((int16_t)rawData[0] << 8) | rawData[1]) ;
+            aSTAvg[1] += (int16_t)(((int16_t)rawData[2] << 8) | rawData[3]) ;
+            aSTAvg[2] += (int16_t)(((int16_t)rawData[4] << 8) | rawData[5]) ;
+
+            for (int j = 0; j < 6; j++) {
+                rawData[j] = icm . read(GYRO_XOUT_H + j);
+            }
+                
+            gSTAvg[0] += (int16_t)(((int16_t)rawData[0] << 8) | rawData[1]) ;
+            gSTAvg[1] += (int16_t)(((int16_t)rawData[2] << 8) | rawData[3]) ;
+            gSTAvg[2] += (int16_t)(((int16_t)rawData[4] << 8) | rawData[5]) ;
+        }
+
+
+        for (int i = 0; i < 3; i++) {
+            aSTAvg[i] /= iters;
+            gSTAvg[i] /= iters;
+        }
+
+
+
+        DPRINT("4\n");
 
         icm . setBank(BANK_2);
 
@@ -351,7 +442,8 @@ namespace ECE4180 {
 
     // todo: delay?
 
-        icm . setBank(BANK_2);
+        icm . setBank(BANK_1);
+        DPRINT("Current Bank: %x (should be 1)\n", icm.read(REG_BANK_SEL));
 
         selfTest[0] = icm . read(SELF_TEST_X_ACCEL);
         selfTest[1] = icm . read(SELF_TEST_Y_ACCEL);
@@ -359,8 +451,10 @@ namespace ECE4180 {
         selfTest[3] = icm . read(SELF_TEST_X_GYRO);
         selfTest[4] = icm . read(SELF_TEST_Y_GYRO);
         selfTest[5] = icm . read(SELF_TEST_Z_GYRO);
+        
+        DPRINT("5\n");
 
-        icm . setBank(BANK_1);
+        icm . setBank(BANK_0);
 
 
         // Retrieve factory self-test value from self-test code reads
@@ -386,18 +480,32 @@ namespace ECE4180 {
             // Report percent differences
             results[i+3] =100.0*((float)(gSTAvg[i] - gAvg[i]))/factoryTrim[i+3]- 100./*selfTest[i+3]*/;
         }
-        char msg[255];
-        sprintf(msg,"x-axis self test: acceleration trim within : %f of factory value\n",results[0]);
-        pc -> write(msg, strlen(msg));
-        sprintf(msg,"y-axis self test: acceleration trim within : %f of factory value\n",results[1]);
-        pc -> write(msg, strlen(msg));
-        sprintf(msg,"z-axis self test: acceleration trim within : %f  of factory value\n",results[2]);
-        pc -> write(msg, strlen(msg));
-        sprintf(msg,"x-axis self test: gyration trim within : %f of factory value\n",results[3]);
-        pc -> write(msg, strlen(msg));
-        sprintf(msg,"y-axis self test: gyration trim within : %f of factory value\n",results[4]);
-        pc -> write(msg, strlen(msg));
-        sprintf(msg,"z-axis self test: gyration trim within : %f of factory value\n",results[5]);
-        pc -> write(msg, strlen(msg));
+        
+        printf("\n\r");
+        printf("x-axis self test: acceleration trim within : %f of factory value\r\n", results[0]);
+        printf("y-axis self test: acceleration trim within : %f of factory value\r\n", results[1]);
+        printf("z-axis self test: acceleration trim within : %f of factory value\r\n", results[2]);
+        printf("x-axis self test:     gyration trim within : %f of factory value\r\n", results[3]);
+        printf("y-axis self test:     gyration trim within : %f of factory value\r\n", results[4]);
+        printf("z-axis self test:     gyration trim within : %f of factory value\r\n", results[5]);
+
+        D(for (int i = 0; i < 6; i++) {
+            DPRINT("Self Test    Value %d: 0x%x\r\n", i, selfTest[i]);
+            DPRINT("Factory Trim Value %d: %f\r\n", i , factoryTrim[i]);
+        });
+        D(
+            for (int i = 0; i < 3; i++) {
+                DPRINT("ACCEL Poll AVG difference [%d]: %d\r\n", i, aSTAvg[i] - aAvg[i]);
+                DPRINT("ACCEL Poll AVG difference [%d]: %d\r\n", i, gSTAvg[i] - gAvg[i]);
+            }
+        );
+        D(
+            for (int i = 0; i < 3; i++) {
+                DPRINT("ACCEL Poll AVG without test [%d]: 0x%x\r\n", i, aAvg[i]);
+                DPRINT("ACCEL Poll AVG with    test [%d]: 0x%x\r\n", i, aSTAvg[i]);
+                DPRINT("GYRO  Poll AVG without test [%d]: 0x%x\r\n", i, gAvg[i]);
+                DPRINT("GYRO  Poll AVG with    test [%d]: 0x%x\r\n", i, gSTAvg[i]);
+            }
+        );
     }
 };

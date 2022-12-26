@@ -6,6 +6,11 @@
 #include <stdint.h>
 #include "defs.h"
 #include "interface.h"
+
+#define DEBUG 0
+#define D(x) if (DEBUG) do {x;} while(0)
+#define DPRINT(args...) if (DEBUG) do {printf(args);fflush(stdout);} while(0);
+
 namespace ECE4180{
     typedef uint8_t byte;
 
@@ -58,6 +63,7 @@ namespace ECE4180{
         bool isConnected();
         bool isReady();
         bool isICM_20948(); // who am i command matches
+        byte whoami();
 
         // basic read/ write operations depending on communication protocol used (SPI vs I2C)
         void read(ICM_20948_BANK_REGISTERS, ICM_20948_BANK_DATA&);
@@ -100,7 +106,7 @@ namespace ECE4180{
 
     };
 
-    void ICM_20948_selfTest(ICM_20948& icm, BufferedSerial* pc);
+    void ICM_20948_selfTest(ICM_20948&);
 };
 
 #define __ICM_20948_H__
