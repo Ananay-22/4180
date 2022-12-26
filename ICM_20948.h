@@ -7,7 +7,7 @@
 #include "defs.h"
 #include "interface.h"
 
-#define ICM_20948_DEBUG 1
+#define ICM_20948_DEBUG 0
 #define ICM_20948_D(x) if (ICM_20948_DEBUG) do {x;} while(0)
 #define ICM_20948_DPRINT(args...) if (ICM_20948_DEBUG) do {printf(args);fflush(stdout);} while(0);
 
