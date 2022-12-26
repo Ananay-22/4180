@@ -1,7 +1,9 @@
 #include "ICM_20948.h"
+#include <cstdint>
 #include <cstdio>
 
 // TODO: make sure right bank is selected in command interface
+// TODO: make sure that the commands before the temp/ sleep commit are all reading data, changing only bits to be updated, then writing the data.
 namespace ECE4180 {
     namespace ICM_20948 {
         ICM_20948::ICM_20948(PinName sda, PinName scl) : I2C(sda, scl)
@@ -310,8 +312,67 @@ namespace ECE4180 {
             this -> write(FIFO_MODE, param);
         }
 
+        void ICM_20948::enableTemp() {
+            this -> setBank(BANK_0);
+            BANK_DATA data;
+            data . RAW = 0;
+            this -> read  (PWR_MGMT_1, data);
+            data . PWR_MGMT_1 . TEMP_DIS = 0;
+            this -> write (PWR_MGMT_1, data);
+        }
+
+        void ICM_20948::disableTemp() {
+            this -> setBank(BANK_0);
+            BANK_DATA data;
+            data . RAW = 0;
+            this -> read  (PWR_MGMT_1, data);
+            data . PWR_MGMT_1 . TEMP_DIS = 1;
+            this -> write (PWR_MGMT_1, data);
+        }
+
+        void ICM_20948::sleep() {
+            this -> setBank(BANK_0);
+            BANK_DATA data;
+            data . RAW = 0;
+            this -> read (PWR_MGMT_1, data);
+            data . PWR_MGMT_1 . SLEEP = 1;
+            this -> write (PWR_MGMT_1, data);
+        }
+
+        void ICM_20948::wakeup() {
+            this -> setBank(BANK_0);
+            BANK_DATA data;
+            data . RAW = 0;
+            this -> read (PWR_MGMT_1, data);
+            data . PWR_MGMT_1 . SLEEP = 0;
+            this -> write (PWR_MGMT_1, data);
+        }
+
         float ICM_20948::getTemp() {
-            return 0.;
+            // todo: push/ pop bank
+            BANK_DATA data;
+            uint16_t temp_out;
+            float retVal;
+
+            const uint32_t RoomTempOffset  =      0; // deg C; datasheet pdf page 14
+            const float    TempSensitivity = 333.87; // LSB/ deg C; datasheet pdf page 14
+            
+            this -> setBank(BANK_0);
+
+            temp_out = 0;
+
+            data . RAW = 0;
+            this -> read(TEMP_OUT_H, data);
+            temp_out = data . TEMP_OUT_H . TEMP_OUT_H << 8;
+
+            data . RAW = 0;
+            this -> read(TEMP_OUT_L, data);
+            temp_out |= data . TEMP_OUT_L . TEMP_OUT_L;
+
+            ICM_20948_DPRINT("Temperature measured: %d\n", temp_out);
+
+            retVal = ((float) (temp_out - RoomTempOffset) / TempSensitivity) + 21; // datasheet 8.31
+            return retVal;
         }
 
 
