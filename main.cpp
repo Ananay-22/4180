@@ -3,7 +3,7 @@
 #include <cstdio>
 #include <cstring>
 
-using namespace ECE4180;
+using namespace ECE4180::ICM_20948;
 
 ICM_20948 icm(p28, p27);
 // main() runs in its own thread in the OS
