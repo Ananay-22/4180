@@ -9,11 +9,11 @@ ICM_20948 icm(p28, p27);
 // main() runs in its own thread in the OS
 int main()
 {    
-    DPRINT("Connected to mbed\r\n");    
-    DPRINT("WHO_AM_I: %x\r\n", icm . whoami());
+    printf("Connected to mbed\r\n");    
+    printf("WHO_AM_I: %x\r\n", icm . whoami());
 
     if (!icm . isConnected()) {
-        DPRINT("Cannot detect ICM 20948\r\n");
+        printf("Cannot detect ICM 20948\r\n");
         return 1;
     }
     
