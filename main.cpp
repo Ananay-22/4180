@@ -18,21 +18,21 @@ int main()
         return 1;
     }
     
-    // ICM_20948_selfTest(icm);
+    ICM_20948_selfTest(icm);
 
-    icm . enableTemp();
-    icm . sleep();
+    // icm . enableTemp();
+    // icm . sleep();
 
-    int counter = 0;
-    while (1) {
-        printf("[%4d] Current temperature: %7.3f degrees C\n", counter, icm . getTemp());
-        thread_sleep_for(30);
+    // int counter = 0;
+    // while (1) {
+    //     printf("[%4d] Current temperature: %7.3f degrees C\n", counter, icm . getTemp());
+    //     thread_sleep_for(30);
 
-        if (counter == 90) {
-            icm . wakeup();
-        }
-        counter++;
-    }
+    //     if (counter == 90) {
+    //         icm . wakeup();
+    //     }
+    //     counter++;
+    // }
     return 0;
 }
 

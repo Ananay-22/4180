@@ -386,7 +386,7 @@ namespace ECE4180 {
             int32_t gAvg[3] = {0}, aAvg[3] = {0}, aSTAvg[3] = {0}, gSTAvg[3] = {0};
             float factoryTrim[6];
             uint8_t FS = 0;
-            int iters = 20;
+            int iters = 200;
 
             printf("Running ICM 20948 Self Test [%d iterations]\r\n", iters);
 
