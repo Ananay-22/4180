@@ -315,13 +315,15 @@ namespace ECE4180 {
     // deviation is a pass.
     void ICM_20948_selfTest(ICM_20948& icm)
     {
-        printf("Running ICM 20948 Self Test\r\n");
         uint8_t rawData[6] = {0, 0, 0, 0, 0, 0};
         uint8_t selfTest[6];
         int32_t gAvg[3] = {0}, aAvg[3] = {0}, aSTAvg[3] = {0}, gSTAvg[3] = {0};
         float factoryTrim[6];
         uint8_t FS = 0;
         int iters = 20;
+
+        printf("Running ICM 20948 Self Test [%d iterations]\r\n", iters);
+
 
         ICM_20948_BANK_DATA param, value;
 
