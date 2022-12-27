@@ -76,6 +76,9 @@ namespace ECE4180{
             void enableTemp();
             void disableTemp();
 
+            void enableAccel();
+            void disableAccel();
+
             //void setClockSource();
 
 
@@ -96,9 +99,9 @@ namespace ECE4180{
 
             void readAGMT();
             float getTemp(); // check units
-            vec3 getGyro(); // check units
-            vec3 getAcc(); // check units
-            vec3 getMag(); // check units
+            void getGyro(vec3&); // check units
+            void  getAcc(vec3&); // check units
+            void  getMag(vec3&); // check units
 
 
             // interrupts as per datasheet section 5

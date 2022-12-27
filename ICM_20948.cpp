@@ -375,6 +375,63 @@ namespace ECE4180 {
             return retVal;
         }
 
+        void ICM_20948::enableAccel() {
+            this -> setBank(BANK_0);
+            BANK_DATA data;
+            data . RAW = 0;
+            this -> read  (PWR_MGMT_2, data);
+            data . PWR_MGMT_2 . DISABLE_ACCEL = 0b000;
+            this -> write (PWR_MGMT_2, data);
+        }
+
+        void ICM_20948::disableAccel() {
+            this -> setBank(BANK_0);
+            BANK_DATA data;
+            data . RAW = 0;
+            this -> read  (PWR_MGMT_2, data);
+            data . PWR_MGMT_2 . DISABLE_ACCEL = 0b111;
+            this -> write (PWR_MGMT_2, data);
+        }
+
+        void ICM_20948::getAcc(vec3 & retVal) {
+            uint16_t accel_xout = 0, accel_yout = 0, accel_zout = 0;
+            BANK_DATA data;
+            uint16_t accel_sensitivity;
+
+            this -> setBank(BANK_2);
+            data.RAW = 0;
+            this -> read(ACCEL_CONFIG, data);
+            accel_sensitivity = 1 << (14 - data . ACCEL_CONFIG . ACCEL_FS_SEL);
+            
+            this -> setBank(BANK_0);
+            data . RAW = 0;
+            this -> read(ACCEL_XOUT_H, data);
+            accel_xout = data . ACCEL_XOUT_H . ACCEL_XOUT_H << 8;
+            data . RAW = 0;
+            this -> read(ACCEL_XOUT_L, data);
+            accel_xout |= data . ACCEL_XOUT_L . ACCEL_XOUT_L;
+
+            data . RAW = 0;
+            this -> read(ACCEL_YOUT_H, data);
+            accel_yout = data . ACCEL_YOUT_H . ACCEL_YOUT_H << 8;
+            data . RAW = 0;
+            this -> read(ACCEL_YOUT_L, data);
+            accel_yout |= data . ACCEL_YOUT_L . ACCEL_YOUT_L;
+
+            data . RAW = 0;
+            this -> read(ACCEL_ZOUT_H, data);
+            accel_zout = data . ACCEL_ZOUT_H . ACCEL_ZOUT_H << 8;
+            data . RAW = 0;
+            this -> read(ACCEL_ZOUT_L, data);
+            accel_zout |= data . ACCEL_ZOUT_L . ACCEL_ZOUT_L;
+
+            ICM_20948_DPRINT("%d - %d %d %d\r\n", accel_sensitivity, accel_xout, accel_yout, accel_zout);
+
+            retVal.x = (float) accel_xout / accel_sensitivity;
+            retVal.y = (float) accel_yout / accel_sensitivity;
+            retVal.z = (float) accel_zout / accel_sensitivity;
+        }
+
 
         // Accelerometer and gyroscope self test; check calibration wrt factory settings
         // Should return percent deviation from factory trim values, +/- 14 or less
